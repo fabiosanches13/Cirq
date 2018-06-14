@@ -81,7 +81,6 @@ def bv(n_qubits: int, a: int, shots: int = NUM_SHOTS) -> collections.Counter:
     return collections.Counter(result_strs)
 
 
-
 def main(argv):
     """Demonstrates Bernstein-Vazirani algorithm.
 
