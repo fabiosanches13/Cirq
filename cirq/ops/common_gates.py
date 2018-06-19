@@ -184,13 +184,21 @@ class RotZGate(eigen_gate.EigenGate,
                                   qubit_count=None,
                                   use_unicode_characters=True,
                                   precision=3):
+        if abs(self.half_turns) == 0.5:
+            return 'S'
+        if abs(self.half_turns) == 0.25:
+            return 'T'
         return 'Z',
 
-    def text_diagram_exponent(self):
-        return self._exponent
+    def text_diagram_exponent(self) -> float:
+        if self.half_turns in [0.5, 0.25, -0.25, -0.5]:
+            return 1 if self.half_turns > 0 else -1
+        return self.half_turns
 
     def __repr__(self) -> str:
         if self.half_turns == 1:
+            return 'Z'
+        if self.half_turns == 0.5:
             return 'Z'
         return 'Z**{!r}'.format(self.half_turns)
 
@@ -199,14 +207,17 @@ class MeasurementGate(gate_features.TextDiagrammableGate):
     """Indicates that qubits should be measured plus a key to identify results.
 
     Params:
-        key: The string key of the measurement.
+        key: The string key of the measurement. If this is set to None, then
+            some default key will be used instead (e.g.
+            cirq.google.XmonSimulator will use a comma-separated list of the
+            names of the qubits that the measurement gate was applied to).
         invert_mask: A list of Truthy or Falsey values indicating whether
-        the corresponding qubits should be flipped. None indicates no
-        inverting should be done.
+            the corresponding qubits should be flipped. None indicates no
+            inverting should be done.
     """
 
     def __init__(self,
-                 key: str = '',
+                 key: Optional[str],
                  invert_mask: Optional[Tuple[bool, ...]] = None) -> None:
         self.key = key
         self.invert_mask = invert_mask
@@ -216,6 +227,17 @@ class MeasurementGate(gate_features.TextDiagrammableGate):
                                   use_unicode_characters=True,
                                   precision=3):
         return 'M',
+
+    def on_each(self, targets):
+        """Returns a list of operations measuring each of the targets.
+
+        Args:
+            targets: The qubits to apply this measurement gate to.
+
+        Returns:
+            Operations separately measuring the target qubits.
+        """
+        return [self.on(target) for target in targets]
 
     def __repr__(self):
         return 'MeasurementGate({}, {})'.format(repr(self.key),
@@ -237,6 +259,7 @@ X = RotXGate()  # Pauli X gate.
 Y = RotYGate()  # Pauli Y gate.
 Z = RotZGate()  # Pauli Z gate.
 CZ = Rot11Gate()  # Negates the amplitude of the |11> state.
+MEASURE = MeasurementGate(key=None)  # Measurement with key implied by context.
 
 S = Z**0.5
 T = Z**0.25
