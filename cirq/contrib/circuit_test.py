@@ -108,12 +108,12 @@ def check_block_code(k, bad_t_gates, reps):
 
         # Measure layer.
         cirq.H.on_each(measured_qubits),
-        cirq.MEASURE.on_each(measured_qubits),
+        cirq.measure_each(measured_qubits),
 
         # Testing layer. Measures outputs in the T vs TZ basis.
         cirq.T.inverse().on_each(output_qubits),
         cirq.H.on_each(output_qubits),
-        cirq.MEASURE.on_each(output_qubits)
+        cirq.measure_each(output_qubits)
     )
     # print(circuit)
 

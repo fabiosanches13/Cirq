@@ -14,19 +14,18 @@
 
 """Quantum gates that are commonly used in the literature."""
 import math
-from typing import Union, Tuple, Optional
+from typing import Union, Tuple, Optional, List
 
 import numpy as np
 
-from cirq.ops import gate_features, eigen_gate
-from cirq.ops.raw_types import InterchangeableQubitsGate
+from cirq.ops import gate_features, eigen_gate, raw_types
 from cirq.value import Symbol
 
 
 class Rot11Gate(eigen_gate.EigenGate,
                 gate_features.TwoQubitGate,
                 gate_features.TextDiagrammableGate,
-                InterchangeableQubitsGate):
+                raw_types.InterchangeableQubitsGate):
     """Phases the |11> state of two adjacent qubits by a fixed amount.
 
     A ParameterizedCZGate guaranteed to not be using the parameter key field.
@@ -222,6 +221,11 @@ class MeasurementGate(gate_features.TextDiagrammableGate):
         self.key = key
         self.invert_mask = invert_mask
 
+    def validate_args(self, qubits):
+        if (self.invert_mask is not None and
+                len(self.invert_mask) > len(qubits)):
+            raise ValueError('len(invert_mask) > len(qubits)')
+
     def text_diagram_wire_symbols(self,
                                   qubit_count=None,
                                   use_unicode_characters=True,
@@ -253,6 +257,40 @@ class MeasurementGate(gate_features.TextDiagrammableGate):
 
     def __hash__(self):
         return hash((MeasurementGate, self.key, self.invert_mask))
+
+
+def measure(*qubits, key=None, invert_mask=None) -> raw_types.Operation:
+    """Returns a single MeasurementGate applied to all the given qubits.
+
+    Args:
+        *qubits: The qubits that the measurement gate should measure.
+        key: The string key of the measurement. If this is None, it defaults
+            to a comma-separated list of the target qubits' names.
+        invert_mask: A list of Truthy or Falsey values indicating whether
+            the corresponding qubits should be flipped. None indicates no
+            inverting should be done.
+
+    Returns:
+        An operation targeting the given qubits with a measurement.
+    """
+    if key is None:
+        key = ','.join(str(q) for q in qubits)
+    return MeasurementGate(key, invert_mask).on(*qubits)
+
+
+def measure_each(*qubits, key_func=str) -> List[raw_types.Operation]:
+    """Returns a list of operations individually measuring the given qubits.
+
+    Args:
+        *qubits: The qubits to measure.
+        key_func: Determines the key of the measurements of each qubit. Takes
+            the qubit and returns the key for that qubit. Defaults to str.
+
+    Returns:
+        A list of operations individually measuring the given qubits.
+
+    """
+    return [MeasurementGate(key_func(q)).on(q) for q in qubits]
 
 
 X = RotXGate()  # Pauli X gate.
@@ -358,7 +396,7 @@ class SwapGate(gate_features.TextDiagrammableGate,
                gate_features.SelfInverseGate,
                gate_features.KnownMatrixGate,
                gate_features.TwoQubitGate,
-               InterchangeableQubitsGate):
+               raw_types.InterchangeableQubitsGate):
     """Swaps two qubits."""
 
     def matrix(self):
