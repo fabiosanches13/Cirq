@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import os
 import numpy as np
 
 import cirq
@@ -60,7 +62,32 @@ def double_errors(n):
     return [[k1, k2] for k1 in range(n) for k2 in range(k1 + 1, n)]
 
 
+def run_on_simulator(circuit, reps):
+    return cirq.google.XmonSimulator().run(circuit, repetitions=reps)
+
+
+def run_on_engine(circuit, reps):
+    qubits = sorted(list(circuit.qubits()), key=str)
+    new_qubits = {q: cirq.google.XmonQubit(0, i) for i, q in enumerate(qubits)}
+    remapped_circuit = cirq.Circuit(
+        cirq.Moment(
+            cirq.Operation(
+                op.gate,
+                [new_qubits.get(q) for q in op.qubits]
+            )
+            for op in moment.operations
+        )
+        for moment in circuit.moments
+    )
+
+    engine = cirq.google.engine_from_environment()
+    return engine.run(remapped_circuit, repetitions=reps)
+
+
 def check_block_code(k, bad_t_gates, reps):
+    if k & 1:
+        raise ValueError('Not supported: odd k.')
+
     q1 = cirq.NamedQubit('$1')
     q2 = cirq.NamedQubit('$2')
     groups = [
@@ -92,6 +119,9 @@ def check_block_code(k, bad_t_gates, reps):
         cirq.H(q2),
         cirq.H.on_each(g[0] for g in groups[1:]),
 
+        # Multiple of 4 kickback.
+        [cirq.X(groups[0][0])] if k % 4 == 0 else [],
+
         # NOTC layer.
         [HMNot(*[g[0] for g in groups])],
 
@@ -118,12 +148,13 @@ def check_block_code(k, bad_t_gates, reps):
     # print(circuit)
 
     # Simulate
-    results = cirq.google.XmonSimulator().run(circuit, repetitions=reps)
+    results = run_on_engine(circuit, reps)
+    # results = run_on_simulator(circuit, reps)
 
     def read(*q: cirq.QubitId):
         result = np.zeros([reps], dtype=np.bool)
         for e in q:
-            result ^= results.measurements[str(e)][:, 0]
+            result ^= results.measurements[str(e)][:, 0] != 0
         return result
 
     # Post-process
@@ -156,7 +187,8 @@ def check_block_code(k, bad_t_gates, reps):
     any_actual_errors = read()
     for out in outs:
         any_actual_errors |= out
-    missed_errors = any_actual_errors & ~detected_errors
+    implied_errors = (k == 0 and bool(bad_t_gates)) | any_actual_errors
+    missed_errors = implied_errors & ~detected_errors
 
     if np.any(missed_errors):
         print('bad case',
@@ -175,7 +207,7 @@ def _bitstring(x):
 
 
 def main():
-    k = 2
+    k = 4
     n = 8 + 3*k
     reps = 10
 
@@ -194,7 +226,7 @@ def main():
     count = 0
     for s in double_errors(n):
         detected, actual = check_block_code(k, s, reps)
-        if not detected and actual:
+        if not detected and (k == 0 or actual):
             count += 1
     print('-')
 
