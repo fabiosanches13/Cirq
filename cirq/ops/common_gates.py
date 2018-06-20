@@ -14,7 +14,7 @@
 
 """Quantum gates that are commonly used in the literature."""
 import math
-from typing import Union, Tuple, Optional, List
+from typing import Union, Tuple, Optional, List, Iterable, Callable
 
 import numpy as np
 
@@ -278,11 +278,13 @@ def measure(*qubits, key=None, invert_mask=None) -> raw_types.Operation:
     return MeasurementGate(key, invert_mask).on(*qubits)
 
 
-def measure_each(*qubits, key_func=str) -> List[raw_types.Operation]:
+def measure_each(qubits: Iterable[raw_types.QubitId],
+                 key_func: Callable[[raw_types.QubitId], str]=str
+                 ) -> List[raw_types.Operation]:
     """Returns a list of operations individually measuring the given qubits.
 
     Args:
-        *qubits: The qubits to measure.
+        qubits: The qubits to measure.
         key_func: Determines the key of the measurements of each qubit. Takes
             the qubit and returns the key for that qubit. Defaults to str.
 
