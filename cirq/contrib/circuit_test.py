@@ -69,16 +69,13 @@ def run_on_simulator(circuit, reps):
 def run_on_engine(circuit, reps):
     qubits = sorted(list(circuit.qubits()), key=str)
     new_qubits = {q: cirq.google.XmonQubit(0, i) for i, q in enumerate(qubits)}
-    remapped_circuit = cirq.Circuit(
-        cirq.Moment(
-            cirq.Operation(
-                op.gate,
-                [new_qubits.get(q) for q in op.qubits]
-            )
-            for op in moment.operations
+    remapped_circuit = cirq.Circuit.from_ops(
+        cirq.Operation(
+            op.gate,
+            [new_qubits.get(q) for q in op.qubits]
         )
         for moment in circuit.moments
-    )
+        for op in moment.operations)
 
     engine = cirq.google.engine_from_environment()
     return engine.run(remapped_circuit, repetitions=reps)
@@ -207,19 +204,22 @@ def _bitstring(x):
 
 
 def main():
+    reps = 2
     k = 4
+
     n = 8 + 3*k
-    reps = 10
 
     print('perfect T gates case')
     detected, actual = check_block_code(k, [], reps)
-    assert not detected and not actual
+    if detected or actual:
+        print("ERROR IN PERFECT CASE")
     print('-')
 
     print('single error cases')
     for s in single_errors(n):
         detected, actual = check_block_code(k, s, reps)
-        assert detected
+        if not detected:
+            print("MISSED SINGLE QUBIT ERROR")
     print('-')
 
     print('double error cases')
